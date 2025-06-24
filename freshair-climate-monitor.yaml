@@ -7,7 +7,23 @@ blueprint:
     
     Supports both direct threshold values and input_number helpers for central control.
 
-    *Version:* 1.0.0
+    ## Trigger IDs Reference
+    
+    **Opening Recommendations** (when all openings closed):
+    - `open_temp_high` - Recommend opening for cooling
+    - `open_temp_low` - Recommend opening for warming  
+    - `open_humidity_high` - Recommend opening for dehumidifying
+    - `open_humidity_low` - Recommend opening for humidifying
+
+    **Management Recommendations** (when openings are open):
+    - `close_temp_high` - Recommend closing/adjusting when too hot
+    - `close_temp_low` - Recommend closing/adjusting when too cold
+    - `close_humidity_high` - Recommend adjusting when too humid
+    - `close_humidity_low` - Recommend adjusting when too dry
+
+    Use `{{ trigger.id }}` in your actions to determine which scenario triggered.
+
+    *Version:* 1.0.1
   domain: automation
   input:
     door_window_sensors:
@@ -181,7 +197,7 @@ variables:
   # Get current values
   current_temperature: "{{ states(temperature_sensor) | float(0) }}"
   current_humidity: >
-    {% if humidity_sensor %}
+    {% if humidity_sensor and humidity_sensor != '' %}
       {{ states(humidity_sensor) | float(0) }}
     {% else %}
       none
@@ -189,13 +205,13 @@ variables:
 
   # Outdoor values
   outdoor_temperature: >
-    {% if outdoor_temperature_sensor %}
+    {% if outdoor_temperature_sensor and outdoor_temperature_sensor != '' %}
       {{ states(outdoor_temperature_sensor) | float(0) }}
     {% else %}
       none
     {% endif %}
   outdoor_humidity: >
-    {% if outdoor_humidity_sensor %}
+    {% if outdoor_humidity_sensor and outdoor_humidity_sensor != '' %}
       {{ states(outdoor_humidity_sensor) | float(0) }}
     {% else %}
       none
@@ -203,20 +219,20 @@ variables:
 
   # Range values (choose direct or helper)
   temp_min: >
-    {% if range_mode == 'input_number_helpers' and temp_min_helper %}
+    {% if range_mode == 'input_number_helpers' and temp_min_helper and temp_min_helper != '' %}
       {{ states(temp_min_helper) | float(0) }}
     {% else %}
       {{ temp_min_direct }}
     {% endif %}
   temp_max: >
-    {% if range_mode == 'input_number_helpers' and temp_max_helper %}
+    {% if range_mode == 'input_number_helpers' and temp_max_helper and temp_max_helper != '' %}
       {{ states(temp_max_helper) | float(0) }}
     {% else %}
       {{ temp_max_direct }}
     {% endif %}
   humidity_min: >
     {% if enable_humidity_monitoring %}
-      {% if range_mode == 'input_number_helpers' and humidity_min_helper %}
+      {% if range_mode == 'input_number_helpers' and humidity_min_helper and humidity_min_helper != '' %}
         {{ states(humidity_min_helper) | float(0) }}
       {% else %}
         {{ humidity_min_direct }}
@@ -226,7 +242,7 @@ variables:
     {% endif %}
   humidity_max: >
     {% if enable_humidity_monitoring %}
-      {% if range_mode == 'input_number_helpers' and humidity_max_helper %}
+      {% if range_mode == 'input_number_helpers' and humidity_max_helper and humidity_max_helper != '' %}
         {{ states(humidity_max_helper) | float(0) }}
       {% else %}
         {{ humidity_max_direct }}
@@ -263,32 +279,10 @@ variables:
   room_name: "{{ state_attr(temperature_sensor, 'friendly_name') or temperature_sensor }}"
 
 trigger:
-  # --- Main triggers: indoor thresholds exceeded ---
-  - platform: numeric_state
-    entity_id: !input temperature_sensor
-    above: !input temp_max_direct
-    id: temp_high
-  - platform: numeric_state
-    entity_id: !input temperature_sensor
-    below: !input temp_min_direct
-    id: temp_low
-
-  # Humidity triggers (if enabled)
-  - platform: numeric_state
-    entity_id: !input humidity_sensor
-    above: !input humidity_max_direct
-    id: humidity_high
-    enabled: !input enable_humidity_monitoring
-  - platform: numeric_state
-    entity_id: !input humidity_sensor
-    below: !input humidity_min_direct
-    id: humidity_low
-    enabled: !input enable_humidity_monitoring
-
-  # --- Recommendation triggers: outdoor would help, all openings closed ---
-  # Cooling: indoor too hot, outside cooler, all closed
+  # --- Recommendations: open windows when outdoor conditions would help ---
+  # Open for cooling: indoor too hot, outside cooler, all closed
   - platform: template
-    id: recommend_open_cooling
+    id: open_temp_high
     value_template: >
       {{ enable_opening_recommendations
          and all_openings_closed
@@ -296,9 +290,9 @@ trigger:
          and outdoor_temperature is not none
          and outdoor_temperature < current_temperature - 1 }}
 
-  # Warming: indoor too cold, outside warmer, all closed
+  # Open for warming: indoor too cold, outside warmer, all closed
   - platform: template
-    id: recommend_open_warming
+    id: open_temp_low
     value_template: >
       {{ enable_opening_recommendations
          and all_openings_closed
@@ -306,9 +300,9 @@ trigger:
          and outdoor_temperature is not none
          and outdoor_temperature > current_temperature + 1 }}
 
-  # Dehumidify: indoor too humid, outside drier, all closed
+  # Open for dehumidifying: indoor too humid, outside drier, all closed
   - platform: template
-    id: recommend_open_dehumidify
+    id: open_humidity_high
     value_template: >
       {{ enable_opening_recommendations
          and enable_humidity_monitoring
@@ -318,9 +312,9 @@ trigger:
          and outdoor_humidity is not none
          and outdoor_humidity < current_humidity - 5 }}
 
-  # Humidify: indoor too dry, outside more humid, all closed
+  # Open for humidifying: indoor too dry, outside more humid, all closed
   - platform: template
-    id: recommend_open_humidify
+    id: open_humidity_low
     value_template: >
       {{ enable_opening_recommendations
          and enable_humidity_monitoring
@@ -330,65 +324,106 @@ trigger:
          and outdoor_humidity is not none
          and outdoor_humidity > current_humidity + 5 }}
 
+  # --- Recommendations: manage climate when windows are open ---
+  # Close/adjust: temperature too high despite open windows
+  - platform: template
+    id: close_temp_high
+    value_template: >
+      {{ any_openings_open
+         and current_temperature > temp_max }}
+
+  # Close/adjust: temperature too low despite open windows
+  - platform: template
+    id: close_temp_low
+    value_template: >
+      {{ any_openings_open
+         and current_temperature < temp_min }}
+
+  # Adjust ventilation: humidity too high despite open windows
+  - platform: template
+    id: close_humidity_high
+    value_template: >
+      {{ enable_humidity_monitoring
+         and any_openings_open
+         and current_humidity is not none and humidity_max is not none
+         and current_humidity > humidity_max }}
+
+  # Adjust ventilation: humidity too low despite open windows
+  - platform: template
+    id: close_humidity_low
+    value_template: >
+      {{ enable_humidity_monitoring
+         and any_openings_open
+         and current_humidity is not none and humidity_min is not none
+         and current_humidity < humidity_min }}
+
 condition: []
 
 action:
   - variables:
       trigger_type: "{{ trigger.id }}"
       threshold_value: >
-        {% if trigger.id == 'temp_high' %}
+        {% if trigger.id in ['close_temp_high', 'open_temp_high'] %}
           {{ temp_max }}
-        {% elif trigger.id == 'temp_low' %}
+        {% elif trigger.id in ['close_temp_low', 'open_temp_low'] %}
           {{ temp_min }}
-        {% elif trigger.id == 'humidity_high' %}
+        {% elif trigger.id in ['close_humidity_high', 'open_humidity_high'] %}
           {{ humidity_max }}
-        {% elif trigger.id == 'humidity_low' %}
+        {% elif trigger.id in ['close_humidity_low', 'open_humidity_low'] %}
           {{ humidity_min }}
         {% else %}
           none
         {% endif %}
       current_value: >
-        {% if trigger.id in ['temp_high', 'temp_low', 'recommend_open_cooling', 'recommend_open_warming'] %}
+        {% if 'temp' in trigger.id %}
           {{ current_temperature }}
-        {% elif trigger.id in ['humidity_high', 'humidity_low', 'recommend_open_dehumidify', 'recommend_open_humidify'] %}
+        {% elif 'humidity' in trigger.id %}
           {{ current_humidity }}
         {% else %}
           none
         {% endif %}
       unit: >
-        {% if trigger.id in ['temp_high', 'temp_low', 'recommend_open_cooling', 'recommend_open_warming'] %}
+        {% if 'temp' in trigger.id %}
           "°C"
-        {% elif trigger.id in ['humidity_high', 'humidity_low', 'recommend_open_dehumidify', 'recommend_open_humidify'] %}
+        {% elif 'humidity' in trigger.id %}
           "%"
         {% else %}
           ""
         {% endif %}
       recommendation_type: >
-        {% if 'recommend_open_cooling' == trigger.id %}
-          cooling
-        {% elif 'recommend_open_warming' == trigger.id %}
-          warming
-        {% elif 'recommend_open_dehumidify' == trigger.id %}
-          dehumidify
-        {% elif 'recommend_open_humidify' == trigger.id %}
-          humidify
+        {% if trigger.id == 'open_temp_high' %}
+          open_cooling
+        {% elif trigger.id == 'open_temp_low' %}
+          open_warming
+        {% elif trigger.id == 'open_humidity_high' %}
+          open_dehumidify
+        {% elif trigger.id == 'open_humidity_low' %}
+          open_humidify
+        {% elif trigger.id == 'close_temp_high' %}
+          close_cooling
+        {% elif trigger.id == 'close_temp_low' %}
+          close_warming
+        {% elif trigger.id == 'close_humidity_high' %}
+          close_dehumidify
+        {% elif trigger.id == 'close_humidity_low' %}
+          close_humidify
         {% else %}
-          management
+          unknown
         {% endif %}
 
-  # Only run management actions when at least one opening is open
+  # Run opening recommendation actions when all openings are closed
   - choose:
       - conditions:
           - condition: template
             value_template: >
-              {{ trigger_type in ['temp_high', 'temp_low', 'humidity_high', 'humidity_low'] and any_openings_open }}
+              {{ trigger_type.startswith('open_') and all_openings_closed }}
         sequence: !input actions
 
-      # Only run recommendation actions when all openings are closed
+      # Run closing/management actions when at least one opening is open
       - conditions:
           - condition: template
             value_template: >
-              {{ 'recommend_open' in trigger_type and all_openings_closed }}
+              {{ trigger_type.startswith('close_') and any_openings_open }}
         sequence: !input actions
 
 # End of blueprint

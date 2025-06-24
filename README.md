@@ -1,6 +1,6 @@
 # Fresh Air Climate Monitor
 
-> **Current Version: 1.0.0**
+> **Current Version: 1.0.1**
 
 A comprehensive Home Assistant blueprint that provides intelligent climate control through both active monitoring and proactive recommendations for optimal fresh air management.
 
@@ -8,8 +8,7 @@ A comprehensive Home Assistant blueprint that provides intelligent climate contr
 
 ## 🌟 Features
 
-- **Dual Intelligence System**: Combines climate management with opening recommendations
-- **Smart Fresh Air Detection**: Manages climate when doors/windows are open
+- **Smart Fresh Air Detection**: Manages ventilation when doors/windows are open
 - **Proactive Outdoor Analysis**: Recommends opening when outdoor conditions would help
 - **Flexible Threshold Configuration**: Use direct values or input_number helpers for centralized control
 - **Multiple Opening Support**: Monitor multiple doors and windows per room
@@ -37,6 +36,45 @@ You can also enable/disable each function independently:
 - Recommendations only: Pure advisory system
 - Both enabled: Full intelligent climate assistance
 
+## 🎯 Trigger IDs and Their Meanings
+
+The blueprint uses specific trigger IDs to identify different climate scenarios. Understanding these helps you create more targeted actions:
+
+### Opening Recommendation Triggers
+These activate when **openings are closed** and outdoor conditions could help:
+
+| Trigger ID | Condition | When It Fires |
+|------------|-----------|---------------|
+| `open_temp_high` | Room too hot, outside cooler | Recommend opening for natural cooling |
+| `open_temp_low` | Room too cold, outside warmer | Recommend opening for natural warming |
+| `open_humidity_high` | Room too humid, outside drier | Recommend opening for dehumidifying |
+| `open_humidity_low` | Room too dry, outside more humid | Recommend opening for humidifying |
+
+### Closing Recommendation Triggers
+These activate when **openings are open** but outdoor conditions are worse than indoor:
+
+| Trigger ID | Condition | When It Fires |
+|------------|-----------|---------------|
+| `close_temp_high` | Room too hot, outside even hotter | Recommend closing for better cooling |
+| `close_temp_low` | Room too cold, outside even colder | Recommend closing for better warming |
+| `close_humidity_high` | Room too humid, outside even more humid | Recommend closing for better dehumidifying |
+| `close_humidity_low` | Room too dry, outside even drier | Recommend closing for better humidifying |
+
+### Quick Reference
+```yaml
+# In your actions, use trigger.id to determine the scenario:
+- condition: template
+  value_template: "{{ trigger.id.startswith('open_') }}"  # Any opening recommendation
+- condition: template
+  value_template: "{{ trigger.id.startswith('close_') }}"  # Any closing/management recommendation
+- condition: template
+  value_template: "{{ trigger.id == 'open_temp_high' }}"  # Specific cooling opportunity
+- condition: template
+  value_template: "{{ 'temp' in trigger.id }}"  # Any temperature-related trigger
+- condition: template
+  value_template: "{{ 'humidity' in trigger.id }}"  # Any humidity-related trigger
+```
+
 ## 📱 Enhanced Example Actions
 
 ### Comprehensive Notification System
@@ -47,28 +85,28 @@ action:
       # Opening recommendations when all doors/windows closed
       - conditions:
           - condition: template
-            value_template: "{{ 'recommend' in trigger.id }}"
+            value_template: "{{ trigger.id.startswith('open_') }}"
         sequence:
           - service: notify.mobile_app_your_phone
             data:
               title: "💨 Fresh Air Opportunity: {{ room_name }}"
               message: >
-                {% if recommendation_type == 'cooling' %}
+                {% if trigger.id == 'open_temp_high' %}
                   🌡️ Time to open windows for natural cooling!
                   Outside: {{ outdoor_temperature }}°C ({{ temperature_difference | abs }}°C cooler)
                   Inside: {{ current_temperature }}°C ({{ temp_max }}°C max)
                   💡 Opening windows could naturally cool your room!
-                {% elif recommendation_type == 'warming' %}
+                {% elif trigger.id == 'open_temp_low' %}
                   ☀️ Great time to open windows for natural warming!
                   Outside: {{ outdoor_temperature }}°C ({{ temperature_difference }}°C warmer)
                   Inside: {{ current_temperature }}°C ({{ temp_min }}°C min)
                   💡 Let the sunshine help warm your space!
-                {% elif recommendation_type == 'dehumidify' %}
+                {% elif trigger.id == 'open_humidity_high' %}
                   💧 Open windows to reduce humidity naturally!
                   Outside: {{ outdoor_humidity }}% ({{ humidity_difference | abs }}% drier)
                   Inside: {{ current_humidity }}% ({{ humidity_max }}% max)
                   💡 Fresh air circulation can help reduce moisture!
-                {% elif recommendation_type == 'humidify' %}
+                {% elif trigger.id == 'open_humidity_low' %}
                   🌿 Outdoor air can help increase indoor humidity!
                   Outside: {{ outdoor_humidity }}% ({{ humidity_difference }}% more humid)
                   Inside: {{ current_humidity }}% ({{ humidity_min }}% min)
@@ -86,28 +124,32 @@ action:
       # Climate management when doors/windows are open
       - conditions:
           - condition: template
-            value_template: "{{ recommendation_type == 'management' }}"
+            value_template: "{{ trigger.id.startswith('close_') }}"
         sequence:
           - service: notify.mobile_app_your_phone
             data:
               title: "🌡️ Climate Alert: {{ room_name }}"
               message: >
-                {% if trigger_type == 'temp_high' %}
-                  🔥 Temperature is high with {{ open_sensors_count }} opening(s) providing fresh air
+                {% if trigger.id == 'close_temp_high' %}
+                  🔥 Temperature is high and outside is even hotter
                   Current: {{ current_temperature }}°C (Max: {{ temp_max }}°C)
-                  💡 Consider adjusting window positions or adding cross-ventilation
-                {% elif trigger_type == 'temp_low' %}
-                  🧊 Temperature is low despite {{ open_sensors_count }} opening(s)
+                  Outside: {{ outdoor_temperature }}°C
+                  💡 Consider closing windows to prevent more heat from entering
+                {% elif trigger.id == 'close_temp_low' %}
+                  🧊 Temperature is low and outside is even colder
                   Current: {{ current_temperature }}°C (Min: {{ temp_min }}°C)
-                  💡 You might want to close some windows or add heating
-                {% elif trigger_type == 'humidity_high' %}
-                  💧 High humidity with {{ open_sensors_count }} opening(s) for ventilation
+                  Outside: {{ outdoor_temperature }}°C
+                  💡 Consider closing windows to prevent more cold air from entering
+                {% elif trigger.id == 'close_humidity_high' %}
+                  💧 High humidity and outside air is even more humid
                   Current: {{ current_humidity }}% (Max: {{ humidity_max }}%)
-                  💡 Increase air circulation or consider mechanical dehumidification
-                {% elif trigger_type == 'humidity_low' %}
-                  🏜️ Low humidity despite fresh air access
+                  Outside: {{ outdoor_humidity }}%
+                  💡 Consider closing windows to prevent more moisture from entering
+                {% elif trigger.id == 'close_humidity_low' %}
+                  🏜️ Low humidity and outside air is even drier
                   Current: {{ current_humidity }}% (Min: {{ humidity_min }}%)
-                  💡 Add moisture sources or reduce ventilation temporarily
+                  Outside: {{ outdoor_humidity }}%
+                  💡 Consider closing windows to prevent more dry air from entering
                 {% endif %}
               data:
                 actions:
@@ -125,25 +167,25 @@ action:
     data:
       entity_id: media_player.{{ room_name | lower | replace(' ', '_') }}_speaker
       message: >
-        {% if 'recommend' in trigger.id %}
+        {% if trigger.id.startswith('open_') %}
           Climate tip: It's {{ outdoor_temperature }} degrees outside, 
-          {% if recommendation_type == 'cooling' %}
+          {% if trigger.id == 'open_temp_high' %}
             {{ temperature_difference | abs }} degrees cooler than your {{ room_name }}.
             Opening your {{ door_window_sensors | count }} window{% if door_window_sensors | count > 1 %}s{% endif %} 
             could naturally cool the room from {{ current_temperature }} to closer to your 
             {{ temp_max }} degree maximum.
-          {% elif recommendation_type == 'dehumidify' %}
+          {% elif trigger.id == 'open_humidity_high' %}
             with {{ humidity_difference | abs }} percent lower humidity. 
             Opening windows could help reduce your indoor humidity from {{ current_humidity }} percent 
             toward your {{ humidity_max }} percent target.
           {% endif %}
         {% else %}
-          Attention: Your {{ room_name }} {{ trigger_type | replace('_', ' ') }} threshold has been reached.
+          Attention: Your {{ room_name }} {{ trigger.id | replace('_', ' ') }} threshold has been reached.
           Current conditions: {{ current_value }}{{ unit }}, with {{ open_sensors_count }} opening providing fresh air.
-          {% if trigger_type in ['temp_high', 'humidity_high'] %}
-            Consider increasing ventilation.
+          {% if trigger.id in ['close_temp_high', 'close_humidity_high'] %}
+            Outside conditions are worse. Consider closing windows.
           {% else %}
-            You may want to reduce air circulation.
+            Outside conditions are worse. Consider closing windows.
           {% endif %}
         {% endif %}
 ```
@@ -156,7 +198,7 @@ action:
       # Cooling recommendation - suggest dimming lights
       - conditions:
           - condition: template
-            value_template: "{{ recommendation_type == 'cooling' }}"
+            value_template: "{{ trigger.id == 'open_temp_high' }}"
         sequence:
           - service: light.turn_on
             target:
@@ -173,7 +215,7 @@ action:
       # Warming recommendation - suggest bright warm lights
       - conditions:
           - condition: template
-            value_template: "{{ recommendation_type == 'warming' }}"
+            value_template: "{{ trigger.id == 'open_temp_low' }}"
         sequence:
           - service: light.turn_on
             target:
@@ -192,11 +234,11 @@ action:
       entity_id: input_text.climate_recommendations
     data:
       value: >
-        {% if 'recommend' in trigger.id %}
-          {{ room_name }}: {{ recommendation_type | title }} opportunity! 
+        {% if trigger.id.startswith('open_') %}
+          {{ room_name }}: {{ trigger.id | replace('_', ' ') | title }} opportunity! 
           Outside {{ outdoor_temperature }}°C vs inside {{ current_temperature }}°C
         {% else %}
-          {{ room_name }}: {{ trigger_type | replace('_', ' ') | title }} alert - {{ current_value }}{{ unit }}
+          {{ room_name }}: {{ trigger.id | replace('_', ' ') | title }} alert - {{ current_value }}{{ unit }}
         {% endif %}
         
   - service: persistent_notification.create
@@ -204,13 +246,15 @@ action:
       title: "Fresh Air Climate Monitor"
       message: >
         Room: {{ room_name }}
-        Action: {{ recommendation_type | title if 'recommend' in trigger.id else 'Climate Management' }}
-        {% if 'recommend' in trigger.id %}
-        Recommendation: {{ recommendation_type | title }}
+        Action: {{ trigger.id | replace('_', ' ') | title }}
+        {% if trigger.id.startswith('open_') %}
+        Recommendation: Open windows/doors
         Outdoor: {{ outdoor_temperature }}°C / {{ outdoor_humidity }}%
+        {% else %}
+        Recommendation: Close windows/doors
         {% endif %}
         Indoor: {{ current_temperature }}°C / {{ current_humidity }}%
-        Openings: {{ open_sensors_count if recommendation_type == 'management' else 'All closed' }}
+        Openings: {{ open_sensors_count if trigger.id.startswith('close_') else 'All closed' }}
       notification_id: "fresh_air_{{ room_name | lower | replace(' ', '_') }}"
 ```
 
@@ -224,7 +268,7 @@ action:
   - choose:
       - conditions:
           - condition: template
-            value_template: "{{ recommendation_type == 'cooling' and temperature_difference | abs > 5 }}"
+            value_template: "{{ trigger.id == 'open_temp_high' and temperature_difference | abs > 5 }}"
         sequence:
           - service: climate.turn_off
             target:
@@ -235,7 +279,7 @@ action:
 
       - conditions:
           - condition: template
-            value_template: "{{ trigger_type == 'temp_high' and open_sensors_count > 0 }}"
+            value_template: "{{ trigger.id == 'close_temp_high' and open_sensors_count > 0 }}"
         sequence:
           - service: fan.turn_on
             target:
