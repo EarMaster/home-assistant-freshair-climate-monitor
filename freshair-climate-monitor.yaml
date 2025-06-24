@@ -9,6 +9,12 @@ blueprint:
 
     ## Trigger IDs Reference
     
+    **Basic Threshold Alerts** (when both recommendation modes disabled):
+    * `threshold_temp_high` - Simple alert when temperature too high
+    * `threshold_temp_low` - Simple alert when temperature too low
+    * `threshold_humidity_high` - Simple alert when humidity too high
+    * `threshold_humidity_low` - Simple alert when humidity too low
+
     **Opening Recommendations** (when all openings closed):
     * `open_temp_high` - Recommend opening for cooling
     * `open_temp_low` - Recommend opening for warming  
@@ -23,7 +29,7 @@ blueprint:
 
     Use `{{ trigger.id }}` in your actions to determine which scenario triggered.
 
-    *Version:* 1.0.2
+    *Version:* 1.0.3
   domain: automation
   input:
     door_window_sensors:
@@ -48,7 +54,7 @@ blueprint:
 
     humidity_sensor:
       name: Humidity Sensor (optional)
-      description: Select the humidity sensor for this room, if available.
+      description: Select the humidity sensor for this room, if available. Only needed when humidity monitoring is enabled.
       default: ""
       selector:
         entity:
@@ -121,32 +127,32 @@ blueprint:
 
     # Input number helper selectors
     temp_min_helper:
-      name: Temperature Minimum Helper
-      description: Input number helper for minimum temperature
+      name: Temperature Minimum Helper (optional)
+      description: Input number helper for minimum temperature. Only needed when using 'Input Number Helpers' range mode for centralized control.
       default: ""
       selector:
         entity:
           domain: input_number
 
     temp_max_helper:
-      name: Temperature Maximum Helper
-      description: Input number helper for maximum temperature
+      name: Temperature Maximum Helper (optional)
+      description: Input number helper for maximum temperature. Only needed when using 'Input Number Helpers' range mode for centralized control.
       default: ""
       selector:
         entity:
           domain: input_number
 
     humidity_min_helper:
-      name: Humidity Minimum Helper
-      description: Input number helper for minimum humidity
+      name: Humidity Minimum Helper (optional)
+      description: Input number helper for minimum humidity. Only needed when using 'Input Number Helpers' range mode and humidity monitoring is enabled.
       default: ""
       selector:
         entity:
           domain: input_number
 
     humidity_max_helper:
-      name: Humidity Maximum Helper
-      description: Input number helper for maximum humidity
+      name: Humidity Maximum Helper (optional)
+      description: Input number helper for maximum humidity. Only needed when using 'Input Number Helpers' range mode and humidity monitoring is enabled.
       default: ""
       selector:
         entity:
@@ -156,20 +162,20 @@ blueprint:
     enable_opening_recommendations:
       name: Enable Opening Recommendations
       description: Suggest opening windows/doors when outdoor conditions would improve the climate inside.
-      default: true
+      default: false
       selector:
         boolean: {}
 
     enable_closing_recommendations:
       name: Enable Closing Recommendations
       description: Suggest closing windows/doors when outdoor conditions are worse than indoor conditions.
-      default: true
+      default: false
       selector:
         boolean: {}
 
     outdoor_temperature_sensor:
-      name: Outdoor Temperature Sensor
-      description: Outdoor temperature sensor for recommendations.
+      name: Outdoor Temperature Sensor (optional)
+      description: Outdoor temperature sensor for recommendations. Required when opening or closing recommendations are enabled to compare indoor vs outdoor conditions.
       default: ""
       selector:
         entity:
@@ -178,7 +184,7 @@ blueprint:
 
     outdoor_humidity_sensor:
       name: Outdoor Humidity Sensor (optional)
-      description: Outdoor humidity sensor for recommendations.
+      description: Outdoor humidity sensor for recommendations. Only needed when humidity monitoring and opening/closing recommendations are both enabled.
       default: ""
       selector:
         entity:
@@ -286,6 +292,41 @@ variables:
   room_name: "{{ state_attr(temperature_sensor, 'friendly_name') or temperature_sensor }}"
 
 trigger:
+  # --- Basic threshold monitoring (works regardless of recommendation settings) ---
+  # Simple temperature alerts
+  - platform: template
+    id: threshold_temp_high
+    value_template: >
+      {{ current_temperature > temp_max
+         and not enable_opening_recommendations
+         and not enable_closing_recommendations }}
+
+  - platform: template
+    id: threshold_temp_low
+    value_template: >
+      {{ current_temperature < temp_min
+         and not enable_opening_recommendations
+         and not enable_closing_recommendations }}
+
+  # Simple humidity alerts (if enabled)
+  - platform: template
+    id: threshold_humidity_high
+    value_template: >
+      {{ enable_humidity_monitoring
+         and current_humidity is not none and humidity_max is not none
+         and current_humidity > humidity_max
+         and not enable_opening_recommendations
+         and not enable_closing_recommendations }}
+
+  - platform: template
+    id: threshold_humidity_low
+    value_template: >
+      {{ enable_humidity_monitoring
+         and current_humidity is not none and humidity_min is not none
+         and current_humidity < humidity_min
+         and not enable_opening_recommendations
+         and not enable_closing_recommendations }}
+
   # --- Recommendations: open windows when outdoor conditions would help ---
   # Open for cooling: indoor too hot, outside cooler, all closed
   - platform: template
@@ -382,13 +423,13 @@ action:
   - variables:
       trigger_type: "{{ trigger.id }}"
       threshold_value: >
-        {% if trigger.id in ['close_temp_high', 'open_temp_high'] %}
+        {% if trigger.id in ['close_temp_high', 'open_temp_high', 'threshold_temp_high'] %}
           {{ temp_max }}
-        {% elif trigger.id in ['close_temp_low', 'open_temp_low'] %}
+        {% elif trigger.id in ['close_temp_low', 'open_temp_low', 'threshold_temp_low'] %}
           {{ temp_min }}
-        {% elif trigger.id in ['close_humidity_high', 'open_humidity_high'] %}
+        {% elif trigger.id in ['close_humidity_high', 'open_humidity_high', 'threshold_humidity_high'] %}
           {{ humidity_max }}
-        {% elif trigger.id in ['close_humidity_low', 'open_humidity_low'] %}
+        {% elif trigger.id in ['close_humidity_low', 'open_humidity_low', 'threshold_humidity_low'] %}
           {{ humidity_min }}
         {% else %}
           none
@@ -426,19 +467,29 @@ action:
           close_dehumidify
         {% elif trigger.id == 'close_humidity_low' %}
           close_humidify
+        {% elif trigger.id.startswith('threshold_') %}
+          threshold_alert
         {% else %}
           unknown
         {% endif %}
 
   # Run opening recommendation actions when all openings are closed
   - choose:
+      # Basic threshold alerts (when neither recommendation mode is enabled)
+      - conditions:
+          - condition: template
+            value_template: >
+              {{ trigger_type.startswith('threshold_') }}
+        sequence: !input actions
+
+      # Opening recommendations
       - conditions:
           - condition: template
             value_template: >
               {{ trigger_type.startswith('open_') and all_openings_closed }}
         sequence: !input actions
 
-      # Run closing/management actions when at least one opening is open
+      # Closing recommendations
       - conditions:
           - condition: template
             value_template: >

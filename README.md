@@ -1,6 +1,6 @@
 # Fresh Air Climate Monitor
 
-> **Current Version: 1.0.2**
+> **Current Version: 1.0.3**
 
 A comprehensive Home Assistant blueprint that provides intelligent climate control through both active monitoring and proactive recommendations for optimal fresh air management.
 
@@ -32,13 +32,24 @@ The blueprint automatically operates in both modes simultaneously:
 
 ### Individual Mode Control
 You can also enable/disable each function independently:
-- Climate Management only: Traditional threshold monitoring
-- Recommendations only: Pure advisory system
-- Both enabled: Full intelligent climate assistance
+- **Opening Recommendations only**: Smart suggestions when to open windows/doors
+- **Closing Recommendations only**: Smart suggestions when to close windows/doors  
+- **Both enabled**: Full intelligent climate assistance
+- **Neither enabled**: Basic threshold monitoring without recommendations
 
 ## 🎯 Trigger IDs and Their Meanings
 
 The blueprint uses specific trigger IDs to identify different climate scenarios. Understanding these helps you create more targeted actions:
+
+### Basic Threshold Triggers
+These activate when **both recommendation modes are disabled** for simple monitoring:
+
+| Trigger ID | Condition | When It Fires |
+|------------|-----------|---------------|
+| `threshold_temp_high` | Temperature above maximum | Simple alert when too hot |
+| `threshold_temp_low` | Temperature below minimum | Simple alert when too cold |
+| `threshold_humidity_high` | Humidity above maximum | Simple alert when too humid |
+| `threshold_humidity_low` | Humidity below minimum | Simple alert when too dry |
 
 ### Opening Recommendation Triggers
 These activate when **openings are closed** and outdoor conditions could help:
@@ -64,9 +75,11 @@ These activate when **openings are open** but outdoor conditions are worse than 
 ```yaml
 # In your actions, use trigger.id to determine the scenario:
 - condition: template
+  value_template: "{{ trigger.id.startswith('threshold_') }}"  # Basic threshold alerts
+- condition: template
   value_template: "{{ trigger.id.startswith('open_') }}"  # Any opening recommendation
 - condition: template
-  value_template: "{{ trigger.id.startswith('close_') }}"  # Any closing/management recommendation
+  value_template: "{{ trigger.id.startswith('close_') }}"  # Any closing recommendation
 - condition: template
   value_template: "{{ trigger.id == 'open_temp_high' }}"  # Specific cooling opportunity
 - condition: template
@@ -82,6 +95,29 @@ These activate when **openings are open** but outdoor conditions are worse than 
 ```
 action:
   - choose:
+      # Basic threshold alerts (simple monitoring mode)
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id.startswith('threshold_') }}"
+        sequence:
+          - service: notify.mobile_app_your_phone
+            data:
+              title: "🌡️ Climate Alert: {{ room_name }}"
+              message: >
+                {% if trigger.id == 'threshold_temp_high' %}
+                  🔥 Temperature is high: {{ current_temperature }}°C (Max: {{ temp_max }}°C)
+                  💡 Consider your cooling options or check ventilation
+                {% elif trigger.id == 'threshold_temp_low' %}
+                  🧊 Temperature is low: {{ current_temperature }}°C (Min: {{ temp_min }}°C)
+                  💡 Consider your heating options or close windows
+                {% elif trigger.id == 'threshold_humidity_high' %}
+                  💧 Humidity is high: {{ current_humidity }}% (Max: {{ humidity_max }}%)
+                  💡 Consider dehumidification or improving air circulation
+                {% elif trigger.id == 'threshold_humidity_low' %}
+                  🏜️ Humidity is low: {{ current_humidity }}% (Min: {{ humidity_min }}%)
+                  💡 Consider humidification or reducing air circulation
+                {% endif %}
+
       # Opening recommendations when all doors/windows closed
       - conditions:
           - condition: template
