@@ -152,14 +152,6 @@ action:
                   Inside: {{ current_humidity }}% ({{ humidity_min }}% min)
                   💡 Natural moisture from outside air could help!
                 {% endif %}
-              data:
-                actions:
-                  - action: "REMIND_LATER"
-                    title: "Remind in 30 min"
-                  - action: "DISMISS_RECOMMENDATION"
-                    title: "Not suitable now"
-                  - action: "VIEW_DETAILS"
-                    title: "More info"
 
       # Climate management when doors/windows are open
       - conditions:
@@ -168,35 +160,29 @@ action:
         sequence:
           - service: notify.mobile_app_your_phone
             data:
-              title: "🌡️ Climate Alert: {{ room_name }}"
+              title: "🌡️ Climate Management: {{ room_name }}"
               message: >
                 {% if trigger.id == 'close_temp_high' %}
-                  🔥 Temperature is high and outside is even hotter
-                  Current: {{ current_temperature }}°C (Max: {{ temp_max }}°C)
-                  Outside: {{ outdoor_temperature }}°C
-                  💡 Consider closing windows to prevent more heat from entering
+                  🔥 Time to close windows to prevent overheating!
+                  Outside: {{ outdoor_temperature }}°C ({{ temperature_difference }}°C hotter)
+                  Inside: {{ current_temperature }}°C ({{ temp_max }}°C max)
+                  💡 Closing windows could prevent more heat from entering!
                 {% elif trigger.id == 'close_temp_low' %}
-                  🧊 Temperature is low and outside is even colder
-                  Current: {{ current_temperature }}°C (Min: {{ temp_min }}°C)
-                  Outside: {{ outdoor_temperature }}°C
-                  💡 Consider closing windows to prevent more cold air from entering
+                  🧊 Time to close windows to retain warmth!
+                  Outside: {{ outdoor_temperature }}°C ({{ temperature_difference | abs }}°C colder)
+                  Inside: {{ current_temperature }}°C ({{ temp_min }}°C min)
+                  💡 Closing windows could prevent heat loss!
                 {% elif trigger.id == 'close_humidity_high' %}
-                  💧 High humidity and outside air is even more humid
-                  Current: {{ current_humidity }}% (Max: {{ humidity_max }}%)
-                  Outside: {{ outdoor_humidity }}%
-                  💡 Consider closing windows to prevent more moisture from entering
+                  💧 Close windows to prevent excess moisture!
+                  Outside: {{ outdoor_humidity }}% ({{ humidity_difference }}% more humid)
+                  Inside: {{ current_humidity }}% ({{ humidity_max }}% max)
+                  💡 Outdoor air would add unwanted moisture!
                 {% elif trigger.id == 'close_humidity_low' %}
-                  🏜️ Low humidity and outside air is even drier
-                  Current: {{ current_humidity }}% (Min: {{ humidity_min }}%)
-                  Outside: {{ outdoor_humidity }}%
-                  💡 Consider closing windows to prevent more dry air from entering
+                  🏜️ Close windows to retain indoor moisture!
+                  Outside: {{ outdoor_humidity }}% ({{ humidity_difference | abs }}% drier)
+                  Inside: {{ current_humidity }}% ({{ humidity_min }}% min)
+                  💡 Outdoor air would remove more moisture!
                 {% endif %}
-              data:
-                actions:
-                  - action: "CLIMATE_ADJUST"
-                    title: "Suggest adjustments"
-                  - action: "VIEW_SENSORS"
-                    title: "Check all sensors"
 ```
 
 ### Smart TTS Announcements
