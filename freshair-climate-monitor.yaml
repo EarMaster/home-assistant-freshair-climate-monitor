@@ -30,12 +30,13 @@ blueprint:
 
     Use `{{ trigger.id }}` in your actions to determine which scenario triggered.
 
-    *Version:* 1.0.5
+    *Version:* 1.1.0
   domain: automation
   input:
     door_window_sensors:
-      name: Door/Window Sensors
-      description: Select one or more door/window sensors for this room.
+      name: Door/Window Sensors (optional)
+      description: Select one or more door/window sensors for this room. Required when opening or closing recommendations are enabled to detect opening states. Not needed for basic threshold monitoring.
+      default: []
       selector:
         entity:
           multiple: true
@@ -204,10 +205,14 @@ mode: single
 max_exceeded: silent
 
 variables:
-  # Helper to check if input is a list or single entity
+  # Helper to check if input is a list or single entity, handle empty case
   door_window_sensors_list: >
-    {% set s = iif(door_window_sensors is string, [door_window_sensors], door_window_sensors) %}
-    {{ s }}
+    {% if door_window_sensors %}
+      {% set s = iif(door_window_sensors is string, [door_window_sensors], door_window_sensors) %}
+      {{ s }}
+    {% else %}
+      []
+    {% endif %}
 
   # Get current values
   current_temperature: "{{ states(temperature_sensor) | float(0) }}"
@@ -266,15 +271,31 @@ variables:
       none
     {% endif %}
 
-  # Opening status
+  # Opening status (handle case where no sensors are provided)
   open_sensors_count: >
-    {{ door_window_sensors_list | select('is_state', 'on') | list | count }}
+    {% if door_window_sensors_list | length > 0 %}
+      {{ door_window_sensors_list | select('is_state', 'on') | list | count }}
+    {% else %}
+      0
+    {% endif %}
   closed_sensors_count: >
-    {{ door_window_sensors_list | select('is_state', 'off') | list | count }}
+    {% if door_window_sensors_list | length > 0 %}
+      {{ door_window_sensors_list | select('is_state', 'off') | list | count }}
+    {% else %}
+      0
+    {% endif %}
   all_openings_closed: >
-    {{ closed_sensors_count == door_window_sensors_list | count }}
+    {% if door_window_sensors_list | length > 0 %}
+      {{ closed_sensors_count == door_window_sensors_list | count }}
+    {% else %}
+      true
+    {% endif %}
   any_openings_open: >
-    {{ open_sensors_count > 0 }}
+    {% if door_window_sensors_list | length > 0 %}
+      {{ open_sensors_count > 0 }}
+    {% else %}
+      false
+    {% endif %}
 
   # Differences for recommendations
   temperature_difference: >

@@ -1,6 +1,6 @@
 # Fresh Air Climate Monitor
 
-> **Current Version: 1.0.5**
+> **Current Version: 1.1.0**
 
 A comprehensive Home Assistant blueprint that provides intelligent climate control through both active monitoring and proactive recommendations for optimal fresh air management.
 
@@ -93,6 +93,8 @@ These activate when **openings are open** but outdoor conditions are worse than 
 **Note**: Actions are completely optional! You can set up the blueprint without any actions initially, then add them later as needed. The blueprint will monitor your climate conditions and provide all the trigger information without requiring any specific responses.
 
 ### Comprehensive Notification System
+
+**To use this example**: Replace `notify.mobile_app_your_phone` with your actual notification service (e.g., `notify.mobile_app_johns_iphone` or `notify.persistent_notification`).
 
 ```
 action:
@@ -199,6 +201,8 @@ action:
 
 ### Smart TTS Announcements
 
+**To use this example**: Replace `media_player.{{ room_name | lower | replace(' ', '_') }}_speaker` with your actual media player entity (e.g., `media_player.living_room_echo` or `media_player.kitchen_google_home`).
+
 ```
 action:
   - service: tts.speak
@@ -229,6 +233,8 @@ action:
 ```
 
 ### Adaptive Lighting Integration
+
+**To use this example**: Replace `light.{{ room_name | lower | replace(' ', '_') }}_main` with your actual light entity (e.g., `light.living_room_overhead` or `light.bedroom_lamp`).
 
 ```
 action:
@@ -265,6 +271,8 @@ action:
 
 ### Dashboard Integration with Actionable Cards
 
+**To use this example**: Create the helper entity `input_text.climate_recommendations` in your Home Assistant configuration, or replace it with an existing input_text entity.
+
 ```
 action:
   - service: input_text.set_value
@@ -299,6 +307,8 @@ action:
 ## 🔄 Advanced Integration Examples
 
 ### Smart Home Ecosystem Integration
+
+**To use this example**: Replace `climate.{{ room_name | lower | replace(' ', '_') }}` and `fan.{{ room_name | lower | replace(' ', '_') }}_ceiling` with your actual HVAC and fan entities (e.g., `climate.living_room_thermostat` and `fan.bedroom_ceiling_fan`).
 
 ```
 # Integration with HVAC systems
