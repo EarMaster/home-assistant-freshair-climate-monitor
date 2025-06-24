@@ -3,33 +3,34 @@ blueprint:
   description: >
     # Fresh Air Climate Monitor
 
-    Intelligent room climate monitor: triggers actions when temperature/humidity is outside acceptable range and windows/doors are open, or recommends opening them when outdoor conditions would improve the climate inside.
+    Intelligent room climate monitor that triggers actions when temperature/humidity is outside acceptable range. 
+    Provides smart recommendations for opening or closing windows based on outdoor conditions.
     
     Supports both direct threshold values and input_number helpers for central control.
 
-    ## Trigger IDs Reference
+    ## Available Trigger Types
+
+    **Basic Threshold Alerts** (when recommendation modes are disabled)
     
-    **Basic Threshold Alerts** (when both recommendation modes disabled):
-    * `threshold_temp_high` - Simple alert when temperature too high
-    * `threshold_temp_low` - Simple alert when temperature too low
-    * `threshold_humidity_high` - Simple alert when humidity too high
-    * `threshold_humidity_low` - Simple alert when humidity too low
+    Simple alerts when climate thresholds are exceeded:
+    - threshold_temp_high / threshold_temp_low
+    - threshold_humidity_high / threshold_humidity_low
 
-    **Opening Recommendations** (when all openings closed):
-    * `open_temp_high` - Recommend opening for cooling
-    * `open_temp_low` - Recommend opening for warming  
-    * `open_humidity_high` - Recommend opening for dehumidifying
-    * `open_humidity_low` - Recommend opening for humidifying
+    **Opening Recommendations** (when all openings are closed)
+    
+    Smart suggestions to open windows when outdoor conditions would help:
+    - open_temp_high (cooling) / open_temp_low (warming)  
+    - open_humidity_high (dehumidify) / open_humidity_low (humidify)
 
-    **Closing Recommendations** (when openings are open):
-    * `close_temp_high` - Recommend closing when outside is hotter
-    * `close_temp_low` - Recommend closing when outside is colder
-    * `close_humidity_high` - Recommend closing when outside is more humid
-    * `close_humidity_low` - Recommend closing when outside is drier
+    **Closing Recommendations** (when openings are open)
+    
+    Smart suggestions to close windows when outdoor conditions are worse:
+    - close_temp_high / close_temp_low
+    - close_humidity_high / close_humidity_low
 
     Use `{{ trigger.id }}` in your actions to determine which scenario triggered.
 
-    *Version:* 1.0.3
+    *Version:* 1.0.4
   domain: automation
   input:
     door_window_sensors:

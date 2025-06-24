@@ -1,6 +1,6 @@
 # Fresh Air Climate Monitor
 
-> **Current Version: 1.0.3**
+> **Current Version: 1.0.4**
 
 A comprehensive Home Assistant blueprint that provides intelligent climate control through both active monitoring and proactive recommendations for optimal fresh air management.
 
@@ -8,8 +8,7 @@ A comprehensive Home Assistant blueprint that provides intelligent climate contr
 
 ## 🌟 Features
 
-- **Smart Fresh Air Detection**: Manages ventilation when doors/windows are open
-- **Proactive Outdoor Analysis**: Recommends opening when outdoor conditions would help
+- **Proactive Outdoor Analysis**: Recommends opening/closing when outdoor conditions are better/worse than inside
 - **Flexible Threshold Configuration**: Use direct values or input_number helpers for centralized control
 - **Multiple Opening Support**: Monitor multiple doors and windows per room
 - **Rich Action Context**: Detailed variables for sophisticated automation responses
