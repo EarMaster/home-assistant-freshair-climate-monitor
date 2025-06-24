@@ -17,21 +17,7 @@ A comprehensive Home Assistant blueprint that provides intelligent climate contr
 - **Optional Actions**: Set up monitoring first, add actions later - no actions required initially
 - **Robust Error Handling**: Graceful handling of sensor unavailability and edge cases
 
-## 🆕 What's New in Version 1.2.0
-
-**Window State Change Detection**: The blueprint now responds to actual window and door state changes, not just environmental conditions. This means:
-
-- **Smart Window Opening Detection**: When you open a window and it actually helps improve your climate, you'll get positive feedback
-- **Smart Window Closing Detection**: When you close windows and it helps maintain optimal conditions, you'll get confirmation
-- **Clear Trigger**: A new "clear" trigger fires when optimal climate conditions are achieved - perfect for clearing persistent notifications or automatically restarting AC systems
-
-**Enhanced Automation Possibilities**: These new triggers enable more sophisticated automations like:
-- Clearing climate alerts when you take beneficial actions
-- Automatically adjusting HVAC systems when natural ventilation becomes effective
-- Providing positive reinforcement when you make good climate decisions
-- Detecting when it's safe to restart air conditioning after natural ventilation
-
-**Backward Compatibility**: All existing configurations continue to work unchanged - the new triggers are purely additive.
+![Home Assistant Blueprint Configuration](screenshot.png)
 
 ## 🧠 Intelligent Operation Modes
 

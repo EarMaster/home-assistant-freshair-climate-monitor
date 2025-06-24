@@ -6,38 +6,38 @@ blueprint:
     Intelligent room climate monitor that triggers actions when temperature/humidity is outside acceptable range. 
     Provides smart recommendations for opening or closing windows based on outdoor conditions.
     
-    Supports both direct threshold values and input_number helpers for central control. When input_number helpers are provided, they will automatically be used instead of the direct values.
+    Supports both direct threshold values and `input_number` helpers for central control. When `input_number` helpers are provided, they will automatically be used instead of the direct values.
 
     ## Available Trigger Types
 
     **Basic Threshold Alerts** (when recommendation modes are disabled)
     
     Simple alerts when climate thresholds are exceeded:
-    - threshold_temp_high / threshold_temp_low
-    - threshold_humidity_high / threshold_humidity_low
+    - `threshold_temp_high` / `threshold_temp_low`
+    - `threshold_humidity_high` / `threshold_humidity_low`
 
     **Opening Recommendations** (when all openings are closed)
     
     Smart suggestions to open windows when outdoor conditions would help:
-    - open_temp_high (cooling) / open_temp_low (warming)  
-    - open_humidity_high (dehumidify) / open_humidity_low (humidify)
+    - `open_temp_high` (cooling) / `open_temp_low` (warming)  
+    - `open_humidity_high` (dehumidify) / `open_humidity_low` (humidify)
 
     **Closing Recommendations** (when openings are open)
     
     Smart suggestions to close windows when outdoor conditions are worse:
-    - close_temp_high / close_temp_low
-    - close_humidity_high / close_humidity_low
+    - `close_temp_high` / `close_temp_low`
+    - `close_humidity_high` / `close_humidity_low`
 
     **Window State Changes**
     
     Triggered when windows/doors change state and optimal conditions are achieved:
-    - window_opened (when opening helps improve climate)
-    - window_closed (when closing helps improve climate)
-    - clear (when optimal climate is achieved - use to clear notifications or restart AC)
+    - `window_opened` (when opening helps improve climate)
+    - `window_closed` (when closing helps improve climate)
+    - `clear` (when optimal climate is achieved - use to clear notifications or restart AC)
 
     Use `{{ trigger.id }}` in your actions to determine which scenario triggered.
 
-    *Version:* 1.2.0
+    *Version:* 1.2.1
   domain: automation
   input:
     door_window_sensors:
