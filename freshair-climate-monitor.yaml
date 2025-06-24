@@ -1,0 +1,394 @@
+blueprint:
+  name: Fresh Air Climate Monitor
+  description: >
+    # Fresh Air Climate Monitor
+
+    Intelligent room climate monitor: triggers actions when temperature/humidity is outside acceptable range and windows/doors are open, or recommends opening them when outdoor conditions would improve the climate inside.
+    
+    Supports both direct threshold values and input_number helpers for central control.
+
+    *Version:* 1.0.0
+  domain: automation
+  input:
+    door_window_sensors:
+      name: Door/Window Sensors
+      description: Select one or more door/window sensors for this room.
+      selector:
+        entity:
+          multiple: true
+          domain: binary_sensor
+          device_class:
+            - door
+            - window
+            - opening
+
+    temperature_sensor:
+      name: Temperature Sensor
+      description: Select the temperature sensor for this room.
+      selector:
+        entity:
+          domain: sensor
+          device_class: temperature
+
+    humidity_sensor:
+      name: Humidity Sensor (optional)
+      description: Select the humidity sensor for this room, if available.
+      default: ""
+      selector:
+        entity:
+          domain: sensor
+          device_class: humidity
+
+    enable_humidity_monitoring:
+      name: Enable Humidity Monitoring
+      description: Enable monitoring and recommendations for humidity.
+      default: false
+      selector:
+        boolean: {}
+
+    range_mode:
+      name: Range Configuration Mode
+      description: Choose how to define acceptable ranges.
+      default: direct_values
+      selector:
+        select:
+          options:
+            - label: "Direct Values"
+              value: "direct_values"
+            - label: "Input Number Helpers"
+              value: "input_number_helpers"
+
+    # Direct value selectors
+    temp_min_direct:
+      name: Temperature Minimum (Direct)
+      description: Minimum acceptable temperature (°C)
+      default: 18
+      selector:
+        number:
+          min: -10
+          max: 35
+          unit_of_measurement: "°C"
+          step: 0.5
+
+    temp_max_direct:
+      name: Temperature Maximum (Direct)
+      description: Maximum acceptable temperature (°C)
+      default: 25
+      selector:
+        number:
+          min: -10
+          max: 35
+          unit_of_measurement: "°C"
+          step: 0.5
+
+    humidity_min_direct:
+      name: Humidity Minimum (Direct)
+      description: Minimum acceptable humidity (%)
+      default: 30
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: "%"
+          step: 1
+
+    humidity_max_direct:
+      name: Humidity Maximum (Direct)
+      description: Maximum acceptable humidity (%)
+      default: 60
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: "%"
+          step: 1
+
+    # Input number helper selectors
+    temp_min_helper:
+      name: Temperature Minimum Helper
+      description: Input number helper for minimum temperature
+      default: ""
+      selector:
+        entity:
+          domain: input_number
+
+    temp_max_helper:
+      name: Temperature Maximum Helper
+      description: Input number helper for maximum temperature
+      default: ""
+      selector:
+        entity:
+          domain: input_number
+
+    humidity_min_helper:
+      name: Humidity Minimum Helper
+      description: Input number helper for minimum humidity
+      default: ""
+      selector:
+        entity:
+          domain: input_number
+
+    humidity_max_helper:
+      name: Humidity Maximum Helper
+      description: Input number helper for maximum humidity
+      default: ""
+      selector:
+        entity:
+          domain: input_number
+
+    # Outdoor sensors for recommendations
+    enable_opening_recommendations:
+      name: Enable Opening Recommendations
+      description: Suggest opening windows/doors when outdoor conditions would improve the climate inside.
+      default: false
+      selector:
+        boolean: {}
+
+    outdoor_temperature_sensor:
+      name: Outdoor Temperature Sensor
+      description: Outdoor temperature sensor for recommendations.
+      default: ""
+      selector:
+        entity:
+          domain: sensor
+          device_class: temperature
+
+    outdoor_humidity_sensor:
+      name: Outdoor Humidity Sensor (optional)
+      description: Outdoor humidity sensor for recommendations.
+      default: ""
+      selector:
+        entity:
+          domain: sensor
+          device_class: humidity
+
+    # User-defined actions
+    actions:
+      name: Actions
+      description: Actions to run when a threshold is exceeded or a recommendation is made.
+      selector:
+        action: {}
+
+mode: single
+max_exceeded: silent
+
+variables:
+  # Helper to check if input is a list or single entity
+  door_window_sensors_list: >
+    {% set s = iif(door_window_sensors is string, [door_window_sensors], door_window_sensors) %}
+    {{ s }}
+
+  # Get current values
+  current_temperature: "{{ states(temperature_sensor) | float(0) }}"
+  current_humidity: >
+    {% if humidity_sensor %}
+      {{ states(humidity_sensor) | float(0) }}
+    {% else %}
+      none
+    {% endif %}
+
+  # Outdoor values
+  outdoor_temperature: >
+    {% if outdoor_temperature_sensor %}
+      {{ states(outdoor_temperature_sensor) | float(0) }}
+    {% else %}
+      none
+    {% endif %}
+  outdoor_humidity: >
+    {% if outdoor_humidity_sensor %}
+      {{ states(outdoor_humidity_sensor) | float(0) }}
+    {% else %}
+      none
+    {% endif %}
+
+  # Range values (choose direct or helper)
+  temp_min: >
+    {% if range_mode == 'input_number_helpers' and temp_min_helper %}
+      {{ states(temp_min_helper) | float(0) }}
+    {% else %}
+      {{ temp_min_direct }}
+    {% endif %}
+  temp_max: >
+    {% if range_mode == 'input_number_helpers' and temp_max_helper %}
+      {{ states(temp_max_helper) | float(0) }}
+    {% else %}
+      {{ temp_max_direct }}
+    {% endif %}
+  humidity_min: >
+    {% if enable_humidity_monitoring %}
+      {% if range_mode == 'input_number_helpers' and humidity_min_helper %}
+        {{ states(humidity_min_helper) | float(0) }}
+      {% else %}
+        {{ humidity_min_direct }}
+      {% endif %}
+    {% else %}
+      none
+    {% endif %}
+  humidity_max: >
+    {% if enable_humidity_monitoring %}
+      {% if range_mode == 'input_number_helpers' and humidity_max_helper %}
+        {{ states(humidity_max_helper) | float(0) }}
+      {% else %}
+        {{ humidity_max_direct }}
+      {% endif %}
+    {% else %}
+      none
+    {% endif %}
+
+  # Opening status
+  open_sensors_count: >
+    {{ door_window_sensors_list | select('is_state', 'on') | list | count }}
+  closed_sensors_count: >
+    {{ door_window_sensors_list | select('is_state', 'off') | list | count }}
+  all_openings_closed: >
+    {{ closed_sensors_count == door_window_sensors_list | count }}
+  any_openings_open: >
+    {{ open_sensors_count > 0 }}
+
+  # Differences for recommendations
+  temperature_difference: >
+    {% if outdoor_temperature is not none %}
+      {{ outdoor_temperature - current_temperature }}
+    {% else %}
+      none
+    {% endif %}
+  humidity_difference: >
+    {% if enable_humidity_monitoring and outdoor_humidity is not none and current_humidity is not none %}
+      {{ outdoor_humidity - current_humidity }}
+    {% else %}
+      none
+    {% endif %}
+
+  # Room name
+  room_name: "{{ state_attr(temperature_sensor, 'friendly_name') or temperature_sensor }}"
+
+trigger:
+  # --- Main triggers: indoor thresholds exceeded ---
+  - platform: numeric_state
+    entity_id: !input temperature_sensor
+    above: !input temp_max_direct
+    id: temp_high
+  - platform: numeric_state
+    entity_id: !input temperature_sensor
+    below: !input temp_min_direct
+    id: temp_low
+
+  # Humidity triggers (if enabled)
+  - platform: numeric_state
+    entity_id: !input humidity_sensor
+    above: !input humidity_max_direct
+    id: humidity_high
+    enabled: !input enable_humidity_monitoring
+  - platform: numeric_state
+    entity_id: !input humidity_sensor
+    below: !input humidity_min_direct
+    id: humidity_low
+    enabled: !input enable_humidity_monitoring
+
+  # --- Recommendation triggers: outdoor would help, all openings closed ---
+  # Cooling: indoor too hot, outside cooler, all closed
+  - platform: template
+    id: recommend_open_cooling
+    value_template: >
+      {{ enable_opening_recommendations
+         and all_openings_closed
+         and current_temperature > temp_max
+         and outdoor_temperature is not none
+         and outdoor_temperature < current_temperature - 1 }}
+
+  # Warming: indoor too cold, outside warmer, all closed
+  - platform: template
+    id: recommend_open_warming
+    value_template: >
+      {{ enable_opening_recommendations
+         and all_openings_closed
+         and current_temperature < temp_min
+         and outdoor_temperature is not none
+         and outdoor_temperature > current_temperature + 1 }}
+
+  # Dehumidify: indoor too humid, outside drier, all closed
+  - platform: template
+    id: recommend_open_dehumidify
+    value_template: >
+      {{ enable_opening_recommendations
+         and enable_humidity_monitoring
+         and all_openings_closed
+         and current_humidity is not none and humidity_max is not none
+         and current_humidity > humidity_max
+         and outdoor_humidity is not none
+         and outdoor_humidity < current_humidity - 5 }}
+
+  # Humidify: indoor too dry, outside more humid, all closed
+  - platform: template
+    id: recommend_open_humidify
+    value_template: >
+      {{ enable_opening_recommendations
+         and enable_humidity_monitoring
+         and all_openings_closed
+         and current_humidity is not none and humidity_min is not none
+         and current_humidity < humidity_min
+         and outdoor_humidity is not none
+         and outdoor_humidity > current_humidity + 5 }}
+
+condition: []
+
+action:
+  - variables:
+      trigger_type: "{{ trigger.id }}"
+      threshold_value: >
+        {% if trigger.id == 'temp_high' %}
+          {{ temp_max }}
+        {% elif trigger.id == 'temp_low' %}
+          {{ temp_min }}
+        {% elif trigger.id == 'humidity_high' %}
+          {{ humidity_max }}
+        {% elif trigger.id == 'humidity_low' %}
+          {{ humidity_min }}
+        {% else %}
+          none
+        {% endif %}
+      current_value: >
+        {% if trigger.id in ['temp_high', 'temp_low', 'recommend_open_cooling', 'recommend_open_warming'] %}
+          {{ current_temperature }}
+        {% elif trigger.id in ['humidity_high', 'humidity_low', 'recommend_open_dehumidify', 'recommend_open_humidify'] %}
+          {{ current_humidity }}
+        {% else %}
+          none
+        {% endif %}
+      unit: >
+        {% if trigger.id in ['temp_high', 'temp_low', 'recommend_open_cooling', 'recommend_open_warming'] %}
+          "°C"
+        {% elif trigger.id in ['humidity_high', 'humidity_low', 'recommend_open_dehumidify', 'recommend_open_humidify'] %}
+          "%"
+        {% else %}
+          ""
+        {% endif %}
+      recommendation_type: >
+        {% if 'recommend_open_cooling' == trigger.id %}
+          cooling
+        {% elif 'recommend_open_warming' == trigger.id %}
+          warming
+        {% elif 'recommend_open_dehumidify' == trigger.id %}
+          dehumidify
+        {% elif 'recommend_open_humidify' == trigger.id %}
+          humidify
+        {% else %}
+          management
+        {% endif %}
+
+  # Only run management actions when at least one opening is open
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: >
+              {{ trigger_type in ['temp_high', 'temp_low', 'humidity_high', 'humidity_low'] and any_openings_open }}
+        sequence: !input actions
+
+      # Only run recommendation actions when all openings are closed
+      - conditions:
+          - condition: template
+            value_template: >
+              {{ 'recommend_open' in trigger_type and all_openings_closed }}
+        sequence: !input actions
+
+# End of blueprint
