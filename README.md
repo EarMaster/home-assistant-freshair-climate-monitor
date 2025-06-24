@@ -1,6 +1,6 @@
 # Fresh Air Climate Monitor
 
-> **Current Version: 1.1.0**
+> **Current Version: 1.1.1**
 
 A comprehensive Home Assistant blueprint that provides intelligent climate control through both active monitoring and proactive recommendations for optimal fresh air management.
 
