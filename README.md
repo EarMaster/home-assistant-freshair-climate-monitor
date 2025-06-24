@@ -1,6 +1,6 @@
 # Fresh Air Climate Monitor
 
-> **Current Version: 1.1.1**
+> **Current Version: 1.2.0**
 
 A comprehensive Home Assistant blueprint that provides intelligent climate control through both active monitoring and proactive recommendations for optimal fresh air management.
 
@@ -9,11 +9,29 @@ A comprehensive Home Assistant blueprint that provides intelligent climate contr
 ## 🌟 Features
 
 - **Proactive Outdoor Analysis**: Recommends opening/closing when outdoor conditions are better/worse than inside
+- **Window State Change Detection**: Triggers when windows open/close and optimal climate is achieved
+- **Clear Notification Support**: Detects optimal conditions for clearing alerts or restarting AC
 - **Flexible Threshold Configuration**: Use direct values or input_number helpers for centralized control
 - **Multiple Opening Support**: Monitor multiple doors and windows per room
 - **Rich Action Context**: Detailed variables for sophisticated automation responses
 - **Optional Actions**: Set up monitoring first, add actions later - no actions required initially
 - **Robust Error Handling**: Graceful handling of sensor unavailability and edge cases
+
+## 🆕 What's New in Version 1.2.0
+
+**Window State Change Detection**: The blueprint now responds to actual window and door state changes, not just environmental conditions. This means:
+
+- **Smart Window Opening Detection**: When you open a window and it actually helps improve your climate, you'll get positive feedback
+- **Smart Window Closing Detection**: When you close windows and it helps maintain optimal conditions, you'll get confirmation
+- **Clear Trigger**: A new "clear" trigger fires when optimal climate conditions are achieved - perfect for clearing persistent notifications or automatically restarting AC systems
+
+**Enhanced Automation Possibilities**: These new triggers enable more sophisticated automations like:
+- Clearing climate alerts when you take beneficial actions
+- Automatically adjusting HVAC systems when natural ventilation becomes effective
+- Providing positive reinforcement when you make good climate decisions
+- Detecting when it's safe to restart air conditioning after natural ventilation
+
+**Backward Compatibility**: All existing configurations continue to work unchanged - the new triggers are purely additive.
 
 ## 🧠 Intelligent Operation Modes
 
@@ -71,6 +89,15 @@ These activate when **openings are open** but outdoor conditions are worse than 
 | `close_humidity_high` | Room too humid, outside even more humid | Recommend closing for better dehumidifying |
 | `close_humidity_low` | Room too dry, outside even drier | Recommend closing for better humidifying |
 
+### Window State Change Triggers
+These activate when **windows/doors change state** and optimal conditions are achieved:
+
+| Trigger ID | Condition | When It Fires |
+|------------|-----------|---------------|
+| `window_opened` | Window/door opened and helps climate | When opening improves temperature or humidity |
+| `window_closed` | Window/door closed and helps climate | When closing improves temperature or humidity |
+| `clear` | Optimal climate conditions achieved | Use to clear notifications or restart AC |
+
 ### Quick Reference
 ```yaml
 # In your actions, use trigger.id to determine the scenario:
@@ -80,6 +107,12 @@ These activate when **openings are open** but outdoor conditions are worse than 
   value_template: "{{ trigger.id.startswith('open_') }}"  # Any opening recommendation
 - condition: template
   value_template: "{{ trigger.id.startswith('close_') }}"  # Any closing recommendation
+- condition: template
+  value_template: "{{ trigger.id == 'window_opened' }}"  # Window opened and helps climate
+- condition: template
+  value_template: "{{ trigger.id == 'window_closed' }}"  # Window closed and helps climate
+- condition: template
+  value_template: "{{ trigger.id == 'clear' }}"  # Optimal conditions achieved
 - condition: template
   value_template: "{{ trigger.id == 'open_temp_high' }}"  # Specific cooling opportunity
 - condition: template
@@ -100,7 +133,8 @@ These activate when **openings are open** but outdoor conditions are worse than 
 action:
   - choose:
       # Basic threshold alerts (simple monitoring mode)
-      - conditions:
+      - alias: "Threshold Alerts"
+        conditions:
           - condition: template
             value_template: "{{ trigger.id.startswith('threshold_') }}"
         sequence:
@@ -127,7 +161,8 @@ action:
                 tag: "climate_{{ room_name | lower | replace(' ', '_') }}"
 
       # Opening recommendations when all doors/windows closed
-      - conditions:
+      - alias: "Opening Recommendations"
+        conditions:
           - condition: template
             value_template: "{{ trigger.id.startswith('open_') }}"
         sequence:
@@ -162,7 +197,8 @@ action:
                 tag: "climate_{{ room_name | lower | replace(' ', '_') }}"
 
       # Climate management when doors/windows are open
-      - conditions:
+      - alias: "Closing Recommendations"
+        conditions:
           - condition: template
             value_template: "{{ trigger.id.startswith('close_') }}"
         sequence:
@@ -194,6 +230,68 @@ action:
               data:
                 channel: "Fresh Air Climate Monitor"
                 notification_icon: "mdi:window-closed"
+                tag: "climate_{{ room_name | lower | replace(' ', '_') }}"
+
+      # Window state changes that help climate
+      - alias: "Window Opened Confirmation"
+        conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'window_opened' }}"
+        sequence:
+          - service: notify.mobile_app_your_phone
+            data:
+              title: "✅ Window Opened: {{ room_name }}"
+              message: >
+                Great timing! Opening this window will help improve your climate:
+                {% if current_temperature > temp_max and outdoor_temperature < current_temperature - 1 %}
+                🌡️ Natural cooling: Outside {{ outdoor_temperature }}°C vs inside {{ current_temperature }}°C
+                {% elif current_temperature < temp_min and outdoor_temperature > current_temperature + 1 %}
+                ☀️ Natural warming: Outside {{ outdoor_temperature }}°C vs inside {{ current_temperature }}°C
+                {% elif enable_humidity_monitoring and current_humidity > humidity_max and outdoor_humidity < current_humidity - 5 %}
+                💧 Natural dehumidifying: Outside {{ outdoor_humidity }}% vs inside {{ current_humidity }}%
+                {% elif enable_humidity_monitoring and current_humidity < humidity_min and outdoor_humidity > current_humidity + 5 %}
+                🌿 Natural humidifying: Outside {{ outdoor_humidity }}% vs inside {{ current_humidity }}%
+                {% endif %}
+              data:
+                channel: "Fresh Air Climate Monitor"
+                notification_icon: "mdi:window-open-variant"
+                tag: "climate_{{ room_name | lower | replace(' ', '_') }}"
+
+      - alias: "Window Closed Confirmation"
+        conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'window_closed' }}"
+        sequence:
+          - service: notify.mobile_app_your_phone
+            data:
+              title: "✅ Window Closed: {{ room_name }}"
+              message: >
+                Good choice! Closing windows will help maintain better climate:
+                {% if current_temperature > temp_max and outdoor_temperature > current_temperature + 1 %}
+                🌡️ Preventing overheating: Outside {{ outdoor_temperature }}°C vs inside {{ current_temperature }}°C
+                {% elif current_temperature < temp_min and outdoor_temperature < current_temperature - 1 %}
+                🧊 Retaining warmth: Outside {{ outdoor_temperature }}°C vs inside {{ current_temperature }}°C
+                {% elif enable_humidity_monitoring and current_humidity > humidity_max and outdoor_humidity > current_humidity + 5 %}
+                💧 Preventing excess moisture: Outside {{ outdoor_humidity }}% vs inside {{ current_humidity }}%
+                {% elif enable_humidity_monitoring and current_humidity < humidity_min and outdoor_humidity < current_humidity - 5 %}
+                🏜️ Retaining moisture: Outside {{ outdoor_humidity }}% vs inside {{ current_humidity }}%
+                {% endif %}
+              data:
+                channel: "Fresh Air Climate Monitor"
+                notification_icon: "mdi:window-closed-variant"
+                tag: "climate_{{ room_name | lower | replace(' ', '_') }}"
+
+      # Clear notification when optimal conditions are achieved
+      - alias: "Clear Notifications"
+        conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'clear' }}"
+        sequence:
+          # Clear any existing climate notifications for this room
+          - service: notify.mobile_app_your_phone
+            data:
+              message: "clear_notification"
+              data:
                 tag: "climate_{{ room_name | lower | replace(' ', '_') }}"
 ```
 

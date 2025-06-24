@@ -28,9 +28,16 @@ blueprint:
     - close_temp_high / close_temp_low
     - close_humidity_high / close_humidity_low
 
+    **Window State Changes**
+    
+    Triggered when windows/doors change state and optimal conditions are achieved:
+    - window_opened (when opening helps improve climate)
+    - window_closed (when closing helps improve climate)
+    - clear (when optimal climate is achieved - use to clear notifications or restart AC)
+
     Use `{{ trigger.id }}` in your actions to determine which scenario triggered.
 
-    *Version:* 1.1.1
+    *Version:* 1.2.0
   domain: automation
   input:
     door_window_sensors:
@@ -383,7 +390,7 @@ trigger:
          and outdoor_humidity is not none
          and outdoor_humidity > current_humidity + 5 }}
 
-  # --- Recommendations: manage climate when windows are open ---
+  # --- Recommendations: close windows when outdoor conditions are worse ---
   # Close/adjust: temperature too high despite open windows
   - platform: template
     id: close_temp_high
@@ -427,6 +434,39 @@ trigger:
          and current_humidity < humidity_min
          and outdoor_humidity is not none
          and outdoor_humidity < current_humidity - 5 }}
+
+  # --- Window state change triggers ---
+  # Trigger when any window/door opens and it would help the climate
+  - platform: template
+    id: window_opened
+    value_template: >
+      {{ door_window_sensors_list | length > 0
+         and open_sensors_count > 0
+         and ((current_temperature > temp_max and outdoor_temperature < current_temperature - 1) or
+              (current_temperature < temp_min and outdoor_temperature > current_temperature + 1) or
+              (enable_humidity_monitoring and current_humidity > humidity_max and outdoor_humidity < current_humidity - 5) or
+              (enable_humidity_monitoring and current_humidity < humidity_min and outdoor_humidity > current_humidity + 5)) }}
+
+  # Trigger when any window/door closes and it would help the climate
+  - platform: template
+    id: window_closed  
+    value_template: >
+      {{ door_window_sensors_list | length > 0
+         and all_openings_closed
+         and ((current_temperature > temp_max and outdoor_temperature > current_temperature + 1) or
+              (current_temperature < temp_min and outdoor_temperature < current_temperature - 1) or
+              (enable_humidity_monitoring and current_humidity > humidity_max and outdoor_humidity > current_humidity + 5) or
+              (enable_humidity_monitoring and current_humidity < humidity_min and outdoor_humidity < current_humidity - 5)) }}
+
+  # --- Clear trigger: Optimal conditions achieved ---
+  # Trigger when climate is within acceptable range (use to clear notifications or restart AC)
+  - platform: template
+    id: clear
+    value_template: >
+      {{ current_temperature >= temp_min and current_temperature <= temp_max
+         and (not enable_humidity_monitoring 
+              or (current_humidity is not none and humidity_min is not none and humidity_max is not none
+                  and current_humidity >= humidity_min and current_humidity <= humidity_max)) }}
 
 condition: []
 
@@ -480,6 +520,12 @@ action:
           close_humidify
         {% elif trigger.id.startswith('threshold_') %}
           threshold_alert
+        {% elif trigger.id == 'window_opened' %}
+          window_opened
+        {% elif trigger.id == 'window_closed' %}
+          window_closed
+        {% elif trigger.id == 'clear' %}
+          clear
         {% else %}
           unknown
         {% endif %}
@@ -505,6 +551,27 @@ action:
           - condition: template
             value_template: >
               {{ trigger_type.startswith('close_') and any_openings_open }}
+        sequence: !input actions
+
+      # Window opened and it helps climate
+      - conditions:
+          - condition: template
+            value_template: >
+              {{ trigger_type == 'window_opened' }}
+        sequence: !input actions
+
+      # Window closed and it helps climate
+      - conditions:
+          - condition: template
+            value_template: >
+              {{ trigger_type == 'window_closed' }}
+        sequence: !input actions
+
+      # Clear trigger - optimal conditions achieved
+      - conditions:
+          - condition: template
+            value_template: >
+              {{ trigger_type == 'clear' }}
         sequence: !input actions
 
 # End of blueprint
