@@ -121,6 +121,10 @@ action:
                   🏜️ Humidity is low: {{ current_humidity }}% (Min: {{ humidity_min }}%)
                   💡 Consider humidification or reducing air circulation
                 {% endif %}
+              data:
+                channel: "Fresh Air Climate Monitor"
+                notification_icon: "mdi:thermometer-alert"
+                tag: "climate_{{ room_name | lower | replace(' ', '_') }}"
 
       # Opening recommendations when all doors/windows closed
       - conditions:
@@ -152,6 +156,10 @@ action:
                   Inside: {{ current_humidity }}% ({{ humidity_min }}% min)
                   💡 Natural moisture from outside air could help!
                 {% endif %}
+              data:
+                channel: "Fresh Air Climate Monitor"
+                notification_icon: "mdi:window-open"
+                tag: "climate_{{ room_name | lower | replace(' ', '_') }}"
 
       # Climate management when doors/windows are open
       - conditions:
@@ -183,6 +191,10 @@ action:
                   Inside: {{ current_humidity }}% ({{ humidity_min }}% min)
                   💡 Outdoor air would remove more moisture!
                 {% endif %}
+              data:
+                channel: "Fresh Air Climate Monitor"
+                notification_icon: "mdi:window-closed"
+                tag: "climate_{{ room_name | lower | replace(' ', '_') }}"
 ```
 
 ### Smart TTS Announcements
