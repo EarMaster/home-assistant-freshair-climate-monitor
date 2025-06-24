@@ -1,6 +1,6 @@
 # Fresh Air Climate Monitor
 
-> **Current Version: 1.0.4**
+> **Current Version: 1.0.5**
 
 A comprehensive Home Assistant blueprint that provides intelligent climate control through both active monitoring and proactive recommendations for optimal fresh air management.
 
@@ -12,6 +12,7 @@ A comprehensive Home Assistant blueprint that provides intelligent climate contr
 - **Flexible Threshold Configuration**: Use direct values or input_number helpers for centralized control
 - **Multiple Opening Support**: Monitor multiple doors and windows per room
 - **Rich Action Context**: Detailed variables for sophisticated automation responses
+- **Optional Actions**: Set up monitoring first, add actions later - no actions required initially
 - **Robust Error Handling**: Graceful handling of sensor unavailability and edge cases
 
 ## 🧠 Intelligent Operation Modes
@@ -87,7 +88,9 @@ These activate when **openings are open** but outdoor conditions are worse than 
   value_template: "{{ 'humidity' in trigger.id }}"  # Any humidity-related trigger
 ```
 
-## 📱 Enhanced Example Actions
+## 📱 Example Actions
+
+**Note**: Actions are completely optional! You can set up the blueprint without any actions initially, then add them later as needed. The blueprint will monitor your climate conditions and provide all the trigger information without requiring any specific responses.
 
 ### Comprehensive Notification System
 

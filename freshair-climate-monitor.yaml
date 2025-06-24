@@ -30,7 +30,7 @@ blueprint:
 
     Use `{{ trigger.id }}` in your actions to determine which scenario triggered.
 
-    *Version:* 1.0.4
+    *Version:* 1.0.5
   domain: automation
   input:
     door_window_sensors:
@@ -194,8 +194,9 @@ blueprint:
 
     # User-defined actions
     actions:
-      name: Actions
-      description: Actions to run when a threshold is exceeded or a recommendation is made.
+      name: Actions (optional)
+      description: Actions to run when a threshold is exceeded or a recommendation is made. Leave empty to set up monitoring without actions initially.
+      default: []
       selector:
         action: {}
 
@@ -474,7 +475,7 @@ action:
           unknown
         {% endif %}
 
-  # Run opening recommendation actions when all openings are closed
+  # Run actions when conditions are met
   - choose:
       # Basic threshold alerts (when neither recommendation mode is enabled)
       - conditions:
