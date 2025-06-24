@@ -10,20 +10,20 @@ blueprint:
     ## Trigger IDs Reference
     
     **Opening Recommendations** (when all openings closed):
-    - `open_temp_high` - Recommend opening for cooling
-    - `open_temp_low` - Recommend opening for warming  
-    - `open_humidity_high` - Recommend opening for dehumidifying
-    - `open_humidity_low` - Recommend opening for humidifying
+    * `open_temp_high` - Recommend opening for cooling
+    * `open_temp_low` - Recommend opening for warming  
+    * `open_humidity_high` - Recommend opening for dehumidifying
+    * `open_humidity_low` - Recommend opening for humidifying
 
-    **Management Recommendations** (when openings are open):
-    - `close_temp_high` - Recommend closing/adjusting when too hot
-    - `close_temp_low` - Recommend closing/adjusting when too cold
-    - `close_humidity_high` - Recommend adjusting when too humid
-    - `close_humidity_low` - Recommend adjusting when too dry
+    **Closing Recommendations** (when openings are open):
+    * `close_temp_high` - Recommend closing when outside is hotter
+    * `close_temp_low` - Recommend closing when outside is colder
+    * `close_humidity_high` - Recommend closing when outside is more humid
+    * `close_humidity_low` - Recommend closing when outside is drier
 
     Use `{{ trigger.id }}` in your actions to determine which scenario triggered.
 
-    *Version:* 1.0.1
+    *Version:* 1.0.2
   domain: automation
   input:
     door_window_sensors:
@@ -156,7 +156,14 @@ blueprint:
     enable_opening_recommendations:
       name: Enable Opening Recommendations
       description: Suggest opening windows/doors when outdoor conditions would improve the climate inside.
-      default: false
+      default: true
+      selector:
+        boolean: {}
+
+    enable_closing_recommendations:
+      name: Enable Closing Recommendations
+      description: Suggest closing windows/doors when outdoor conditions are worse than indoor conditions.
+      default: true
       selector:
         boolean: {}
 
@@ -329,33 +336,45 @@ trigger:
   - platform: template
     id: close_temp_high
     value_template: >
-      {{ any_openings_open
-         and current_temperature > temp_max }}
+      {{ enable_closing_recommendations
+         and any_openings_open
+         and current_temperature > temp_max
+         and outdoor_temperature is not none
+         and outdoor_temperature > current_temperature + 1 }}
 
   # Close/adjust: temperature too low despite open windows
   - platform: template
     id: close_temp_low
     value_template: >
-      {{ any_openings_open
-         and current_temperature < temp_min }}
+      {{ enable_closing_recommendations
+         and any_openings_open
+         and current_temperature < temp_min
+         and outdoor_temperature is not none
+         and outdoor_temperature < current_temperature - 1 }}
 
   # Adjust ventilation: humidity too high despite open windows
   - platform: template
     id: close_humidity_high
     value_template: >
-      {{ enable_humidity_monitoring
+      {{ enable_closing_recommendations
+         and enable_humidity_monitoring
          and any_openings_open
          and current_humidity is not none and humidity_max is not none
-         and current_humidity > humidity_max }}
+         and current_humidity > humidity_max
+         and outdoor_humidity is not none
+         and outdoor_humidity > current_humidity + 5 }}
 
   # Adjust ventilation: humidity too low despite open windows
   - platform: template
     id: close_humidity_low
     value_template: >
-      {{ enable_humidity_monitoring
+      {{ enable_closing_recommendations
+         and enable_humidity_monitoring
          and any_openings_open
          and current_humidity is not none and humidity_min is not none
-         and current_humidity < humidity_min }}
+         and current_humidity < humidity_min
+         and outdoor_humidity is not none
+         and outdoor_humidity < current_humidity - 5 }}
 
 condition: []
 
